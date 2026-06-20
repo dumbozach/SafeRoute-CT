@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(gh --version)",
+      "Bash(git config *)",
+      "Bash(git push *)",
+      "PowerShell(Start-Process \"control\" -ArgumentList \"/name Microsoft.CredentialManager\")"
+    ]
+  }
+}

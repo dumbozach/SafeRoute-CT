@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute CT</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Landing / route input page -->
+    <div class="landing-page" id="landing-page">
+        <div class="landing-text">
+            <h1>SafeRoute CT</h1>
+            <p>See where crashes cluster around your route</p>
+        </div>
+
+        <div class="input-route">
+            <h2>Input Route</h2>
+            <div class="field">
+                <label for="start-local">Starting Location</label>
+                <input type="text" id="start-local" placeholder="e.g. Hartford, CT">
+            </div>
+
+            <!-- Dynamic stop fields are inserted here by JS -->
+            <div id="stops-container"></div>
+
+            <div class="field">
+                <label for="end-local">Ending Location</label>
+                <input type="text" id="end-local" placeholder="e.g. New Haven, CT">
+            </div>
+            <div class="button-row">
+                <button id="btn-add-stop">Add Stop</button>
+                <button id="btn-enter-route">Enter Route</button>
+            </div>
+            <p class="route-error" id="route-error"></p>
+        </div>
+    </div>
+
+    <!-- Map view (hidden until route is submitted) -->
+    <div class="map-view hidden" id="map-view">
+        <div class="map-header">
+            <button class="back-btn" id="btn-back">&#8592; Edit Route</button>
+            <span class="map-title" id="map-title"></span>
+            <span class="crash-status" id="crash-status"></span>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <!-- Sidebar overlay (darkens map when sidebar is open) -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Crash detail sidebar -->
+    <div class="crash-sidebar" id="crash-sidebar">
+        <div class="sidebar-header">
+            <button class="sidebar-close" id="sidebar-close" aria-label="Close">&times;</button>
+            <h2 class="sidebar-title" id="sidebar-title">Crashes</h2>
+        </div>
+        <div class="sidebar-controls">
+            <div class="sidebar-search-wrap">
+                <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="8.5" cy="8.5" r="5.5"/>
+                    <line x1="13" y1="13" x2="17" y2="17"/>
+                </svg>
+                <input type="search" id="sidebar-search" class="sidebar-search" placeholder="Search by road, town…" autocomplete="off">
+            </div>
+            <div class="filter-chips" id="filter-chips"></div>
+            <p class="sidebar-result-count" id="sidebar-result-count"></p>
+        </div>
+        <div class="sidebar-body" id="sidebar-body"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
