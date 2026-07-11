@@ -146,33 +146,84 @@ body {
     gap: 0.75rem;
 }
 
-.input-route button {
+.button-row button {
     padding: 1rem;
     border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    /* larger tap target for thumbs */
     min-height: 52px;
     transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
     flex: 1;
     -webkit-tap-highlight-color: transparent;
 }
 
-.input-route button:first-of-type {
+.button-row button:first-of-type {
     background: white;
     color: #1e3a8a;
     border: 2px solid #3b82f6;
 }
 
-.input-route button:last-of-type {
+.button-row button:last-of-type {
     background: #1e3a8a;
     color: white;
     border: 2px solid #1e3a8a;
 }
 
-.input-route button:active {
+.button-row button:active {
     transform: scale(0.97);
+}
+
+/* ── Route type toggle ───────────────────────────────────────────── */
+.route-type-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.route-type-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.route-type-toggle {
+    display: flex;
+    border: 2px solid #d1d5db;
+    border-radius: 10px;
+    overflow: hidden;
+    flex: 1;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 0.65rem 1rem;
+    border: none;
+    background: white;
+    color: #6b7280;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mode-btn:first-child {
+    border-right: 2px solid #d1d5db;
+}
+
+.mode-btn.active {
+    background: #1e3a8a;
+    color: white;
+}
+
+.mode-btn:not(.active):hover {
+    background: #f3f4f6;
+    color: #1e3a8a;
 }
 
 /* ── Map view ─────────────────────────────────────────────────────── */
@@ -271,6 +322,57 @@ body {
     color: #dc2626;
     min-height: 1.2em;
     text-align: center;
+}
+
+/* ── Year filter bar ─────────────────────────────────────────────── */
+.year-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 1rem;
+    background: #162d6e;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.year-filter-label {
+    color: rgba(255,255,255,0.7);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.year-btns {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.year-btn {
+    padding: 0.22rem 0.6rem;
+    border-radius: 20px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: rgba(255,255,255,0.75);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.year-btn:hover {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border-color: rgba(255,255,255,0.6);
+}
+
+.year-btn.active {
+    background: white;
+    color: #1e3a8a;
+    border-color: white;
 }
 
 /* ── Crash status chip in map header ────────────────────────────── */
@@ -768,11 +870,11 @@ body {
         width: 100%;
     }
 
-    .input-route button:first-of-type:hover {
+    .button-row button:first-of-type:hover {
         background: #eff6ff;
     }
 
-    .input-route button:last-of-type:hover {
+    .button-row button:last-of-type:hover {
         background: #1e40af;
         box-shadow: 0 4px 14px rgba(30, 58, 138, 0.35);
     }

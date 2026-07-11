@@ -36,14 +36,57 @@ async function geocode(query) {
 }
 
 // ── Routing via OSRM ──────────────────────────────────────────────────────
-async function getRoute(waypoints) {
+async function getRoutes(waypoints) {
     const coords = waypoints.map(p => `${p.lon},${p.lat}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=3`;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Routing request failed');
     const data = await res.json();
     if (data.code !== 'Ok') throw new Error('No route found between those locations');
-    return data.routes[0].geometry;
+    return data.routes; // array; [0] is always fastest
+}
+
+// Score a route by crashes per km — lower is safer
+function crashScorePerKm(geometry, crashes, distanceM) {
+    if (!distanceM) return 0;
+    const coords = geometry.coordinates;
+    let count = 0;
+    for (const feature of crashes) {
+        const [lon, lat] = feature.geometry.coordinates;
+        if (!isFinite(lat) || !isFinite(lon)) continue;
+        for (let i = 0; i < coords.length - 1; i++) {
+            const [alon, alat] = coords[i];
+            const [blon, blat] = coords[i + 1];
+            if (distToSegmentM(lat, lon, alat, alon, blat, blon) <= CRASH_BUFFER_M) {
+                count++;
+                break;
+            }
+        }
+    }
+    return count / (distanceM / 1000);
+}
+
+async function pickRoute(routes) {
+    if (_routeMode === 'faster' || routes.length === 1) return routes[0].geometry;
+
+    // Combined bbox of all alternatives for a single crash fetch
+    let minLat = Infinity, minLon = Infinity, maxLat = -Infinity, maxLon = -Infinity;
+    for (const route of routes) {
+        for (const [lon, lat] of route.geometry.coordinates) {
+            if (lat < minLat) minLat = lat;
+            if (lon < minLon) minLon = lon;
+            if (lat > maxLat) maxLat = lat;
+            if (lon > maxLon) maxLon = lon;
+        }
+    }
+    const crashes = await fetchCrashesInBounds(minLat, minLon, maxLat, maxLon);
+
+    let best = routes[0], bestScore = Infinity;
+    for (const route of routes) {
+        const score = crashScorePerKm(route.geometry, crashes, route.distance);
+        if (score < bestScore) { bestScore = score; best = route; }
+    }
+    return best.geometry;
 }
 
 // ── Marker icons ───────────────────────────────────────────────────────────
@@ -64,6 +107,16 @@ function makeIcon(color, label) {
 const CRASH_API      = 'https://gis.cti.uconn.edu/arcgis/rest/services/Crash_Dashboards/ConnecticutCrash/FeatureServer/0/query';
 const NUM_SEGMENTS   = 30;
 const CRASH_BUFFER_M = 150;
+
+// Selected year for crash filter (default 2024 to avoid 2000-record cap on long routes)
+let _selectedYear = 2024;
+
+// Route preference: 'faster' uses OSRM default; 'safer' scores alternatives by crash density
+let _routeMode = 'faster';
+
+// Last rendered route — stored so year changes can re-render without re-geocoding
+let _currentGeometry = null;
+let _currentPlaces   = null;
 
 // Crash data keyed by segKey so the sidebar can look them up from an onclick
 const _segCrashStore = {};
@@ -120,7 +173,7 @@ function parseCrashDate(raw) {
 }
 
 // ── Crash data fetch ───────────────────────────────────────────────────────
-async function fetchCrashesInBounds(minLat, minLon, maxLat, maxLon) {
+async function fetchCrashesForYear(minLat, minLon, maxLat, maxLon, year) {
     const pad = 0.005;
     const geom = JSON.stringify({
         xmin: minLon - pad, ymin: minLat - pad,
@@ -128,7 +181,7 @@ async function fetchCrashesInBounds(minLat, minLon, maxLat, maxLon) {
         spatialReference: { wkid: 4326 },
     });
     const params = new URLSearchParams({
-        where: 'CrashDateYear >= 2022',
+        where: `CrashDateYear = ${year}`,
         geometry: geom,
         geometryType: 'esriGeometryEnvelope',
         spatialRel: 'esriSpatialRelIntersects',
@@ -141,6 +194,16 @@ async function fetchCrashesInBounds(minLat, minLon, maxLat, maxLon) {
     if (!res.ok) throw new Error(`Crash API ${res.status}`);
     const json = await res.json();
     return json.features ?? [];
+}
+
+async function fetchCrashesInBounds(minLat, minLon, maxLat, maxLon) {
+    if (_selectedYear !== 'all') {
+        return fetchCrashesForYear(minLat, minLon, maxLat, maxLon, _selectedYear);
+    }
+    // Fetch each year in parallel so each gets its own 2000-record budget
+    const years = [2022, 2023, 2024, 2025];
+    const results = await Promise.all(years.map(y => fetchCrashesForYear(minLat, minLon, maxLat, maxLon, y)));
+    return results.flat();
 }
 
 // ── Segment assignment ─────────────────────────────────────────────────────
@@ -408,7 +471,7 @@ function addCrashLegend(maxCount) {
                 <div class="legend-gradient"></div>
                 <span class="legend-label">High (${maxCount})</span>
             </div>
-            <div class="legend-note">2022–present &middot; 150 m buffer</div>
+            <div class="legend-note">${_selectedYear === 'all' ? '2022–2025' : _selectedYear} &middot; 150 m buffer</div>
         `;
         return div;
     };
@@ -444,6 +507,9 @@ function buildColoredRoute(geometry, segments) {
 
 // ── Render route ───────────────────────────────────────────────────────────
 async function renderRoute(geometry, places) {
+    _currentGeometry = geometry;
+    _currentPlaces   = places;
+
     // Reset state from any previous route
     Object.keys(_segCrashStore).forEach(k => delete _segCrashStore[k]);
     _allRouteCrashes = [];
@@ -505,13 +571,32 @@ async function renderRoute(geometry, places) {
 }
 
 // ── Autocomplete ───────────────────────────────────────────────────────────
+// Photon (Komoot) is built for fast search-as-you-type on OSM data.
+// Results are cached and stale requests are aborted so the UI stays snappy.
+
+const _autocompleteCache = new Map();
+
+const STATE_ABBR = {
+    Connecticut: 'CT', 'New York': 'NY', Massachusetts: 'MA',
+    'Rhode Island': 'RI', Vermont: 'VT', 'New Hampshire': 'NH',
+    Maine: 'ME', 'New Jersey': 'NJ', Pennsylvania: 'PA',
+};
+
+function photonLabel(p) {
+    const parts = [p.name];
+    if (p.city && p.city !== p.name)     parts.push(p.city);
+    else if (p.county && p.county !== p.name) parts.push(p.county);
+    if (p.state) parts.push(STATE_ABBR[p.state] || p.state);
+    return parts.filter(Boolean).join(', ');
+}
+
 function attachAutocomplete(input) {
     const field    = input.closest('.field');
     const dropdown = document.createElement('ul');
     dropdown.className = 'autocomplete-dropdown';
     field.appendChild(dropdown);
 
-    let timer, highlighted = -1;
+    let timer, highlighted = -1, controller = null;
 
     function closeDropdown() {
         dropdown.innerHTML = '';
@@ -529,25 +614,43 @@ function attachAutocomplete(input) {
     input.addEventListener('input', () => {
         clearTimeout(timer);
         const val = input.value.trim();
-        if (val.length < 3) { closeDropdown(); return; }
+        if (val.length < 2) { closeDropdown(); return; }
+
         timer = setTimeout(async () => {
+            if (controller) controller.abort();
+            controller = new AbortController();
+
             try {
-                const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&limit=5&countrycodes=us&viewbox=-73.7278,42.0506,-71.7870,40.9506&bounded=1`;
-                const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-                const data = await res.json();
+                const cacheKey = val.toLowerCase();
+                let features;
+
+                if (_autocompleteCache.has(cacheKey)) {
+                    features = _autocompleteCache.get(cacheKey);
+                } else {
+                    // bbox = lon_min,lat_min,lon_max,lat_max (CT + small border buffer)
+                    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(val)}&limit=6&bbox=-73.8,40.9,-71.7,42.1&lang=en`;
+                    const res  = await fetch(url, { signal: controller.signal });
+                    const json = await res.json();
+                    features = (json.features ?? []).filter(f => f.properties?.countrycode === 'US');
+                    _autocompleteCache.set(cacheKey, features);
+                }
+
                 dropdown.innerHTML = '';
                 highlighted = -1;
-                if (!data.length) { closeDropdown(); return; }
-                data.forEach(item => {
-                    const short = item.display_name.split(',').slice(0, 3).join(',').trim();
+                if (!features.length) { closeDropdown(); return; }
+
+                features.forEach(feature => {
+                    const label = photonLabel(feature.properties);
                     const li    = document.createElement('li');
-                    li.textContent = short;
-                    li.addEventListener('mousedown', e => { e.preventDefault(); input.value = short; closeDropdown(); });
+                    li.textContent = label;
+                    li.addEventListener('mousedown', e => { e.preventDefault(); input.value = label; closeDropdown(); });
                     dropdown.appendChild(li);
                 });
                 dropdown.classList.add('visible');
-            } catch { /* ignore */ }
-        }, 300);
+            } catch (err) {
+                if (err.name !== 'AbortError') console.warn('Autocomplete error', err);
+            }
+        }, 150);
     });
 
     input.addEventListener('keydown', e => {
@@ -588,7 +691,7 @@ btnAddStop.addEventListener('click', () => {
 // ── Enter Route ────────────────────────────────────────────────────────────
 btnEnterRoute.addEventListener('click', async () => {
     routeError.textContent = '';
-    btnEnterRoute.textContent = 'Loading…';
+    btnEnterRoute.textContent = _routeMode === 'safer' ? 'Finding safer route…' : 'Loading…';
     btnEnterRoute.disabled = true;
 
     try {
@@ -601,7 +704,8 @@ btnEnterRoute.addEventListener('click', async () => {
         const allQueries = [startVal, ...stopVals, endVal];
 
         const places   = await Promise.all(allQueries.map(q => geocode(q)));
-        const geometry = await getRoute(places);
+        const routes   = await getRoutes(places);
+        const geometry = await pickRoute(routes);
 
         initMap();
         landingPage.classList.add('hidden');
@@ -621,6 +725,33 @@ btnEnterRoute.addEventListener('click', async () => {
     }
 });
 
+// ── Route mode toggle ──────────────────────────────────────────────────────
+document.getElementById('btn-mode-faster').addEventListener('click', () => {
+    _routeMode = 'faster';
+    document.getElementById('btn-mode-faster').classList.add('active');
+    document.getElementById('btn-mode-safer').classList.remove('active');
+});
+
+document.getElementById('btn-mode-safer').addEventListener('click', () => {
+    _routeMode = 'safer';
+    document.getElementById('btn-mode-safer').classList.add('active');
+    document.getElementById('btn-mode-faster').classList.remove('active');
+});
+
+// ── Year filter ────────────────────────────────────────────────────────────
+document.getElementById('year-btns').addEventListener('click', async e => {
+    const btn = e.target.closest('.year-btn');
+    if (!btn || !_currentGeometry) return;
+
+    const year = btn.dataset.year === 'all' ? 'all' : parseInt(btn.dataset.year);
+    if (year === _selectedYear) return;
+
+    _selectedYear = year;
+    document.querySelectorAll('.year-btn').forEach(b => b.classList.toggle('active', b === btn));
+
+    await renderRoute(_currentGeometry, _currentPlaces);
+});
+
 // ── Back button ────────────────────────────────────────────────────────────
 btnBack.addEventListener('click', () => {
     closeSidebar();
@@ -629,4 +760,15 @@ btnBack.addEventListener('click', () => {
     if (legendControl) { map.removeControl(legendControl); legendControl = null; }
     const statusEl = document.getElementById('crash-status');
     if (statusEl) statusEl.textContent = '';
+
+    // Reset filters to defaults for next route
+    _selectedYear = 2024;
+    _routeMode = 'faster';
+    document.getElementById('btn-mode-faster').classList.add('active');
+    document.getElementById('btn-mode-safer').classList.remove('active');
+    _currentGeometry = null;
+    _currentPlaces   = null;
+    document.querySelectorAll('.year-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.year === '2024');
+    });
 });

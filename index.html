@@ -31,6 +31,13 @@
                 <label for="end-local">Ending Location</label>
                 <input type="text" id="end-local" placeholder="e.g. New Haven, CT">
             </div>
+            <div class="route-type-row">
+                <span class="route-type-label">Route type</span>
+                <div class="route-type-toggle">
+                    <button class="mode-btn active" id="btn-mode-faster" type="button">Faster</button>
+                    <button class="mode-btn" id="btn-mode-safer" type="button">Safer</button>
+                </div>
+            </div>
             <div class="button-row">
                 <button id="btn-add-stop">Add Stop</button>
                 <button id="btn-enter-route">Enter Route</button>
@@ -45,6 +52,16 @@
             <button class="back-btn" id="btn-back">&#8592; Edit Route</button>
             <span class="map-title" id="map-title"></span>
             <span class="crash-status" id="crash-status"></span>
+        </div>
+        <div class="year-filter-bar">
+            <span class="year-filter-label">Year:</span>
+            <div class="year-btns" id="year-btns">
+                <button class="year-btn" data-year="2022">2022</button>
+                <button class="year-btn" data-year="2023">2023</button>
+                <button class="year-btn active" data-year="2024">2024</button>
+                <button class="year-btn" data-year="2025">2025</button>
+                <button class="year-btn" data-year="all">All</button>
+            </div>
         </div>
         <div id="map"></div>
     </div>
