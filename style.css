@@ -120,6 +120,49 @@ body {
     letter-spacing: 0.5px;
 }
 
+/* Starting location row: input + locate button side-by-side */
+.input-with-btn {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.input-with-btn input {
+    flex: 1;
+    min-width: 0;
+}
+
+#btn-use-location {
+    flex-shrink: 0;
+    width: 48px;
+    padding: 0;
+    border-radius: 10px;
+    border: 1.5px solid #d1d5db;
+    background: white;
+    color: #3b82f6;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#btn-use-location:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+}
+
+#btn-use-location:active {
+    transform: scale(0.95);
+}
+
+#btn-use-location.locating {
+    color: #6b7280;
+    border-color: #d1d5db;
+    cursor: not-allowed;
+}
+
 .field input {
     padding: 1rem;
     border: 1.5px solid #d1d5db;

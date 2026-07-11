@@ -668,6 +668,58 @@ function attachAutocomplete(input) {
 attachAutocomplete(document.getElementById('start-local'));
 attachAutocomplete(document.getElementById('end-local'));
 
+// ── Use current location ───────────────────────────────────────────────────
+document.getElementById('btn-use-location').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+    }
+    const btn   = document.getElementById('btn-use-location');
+    const input = document.getElementById('start-local');
+
+    btn.classList.add('locating');
+    btn.disabled = true;
+    input.placeholder = 'Locating…';
+
+    navigator.geolocation.getCurrentPosition(
+        async ({ coords }) => {
+            try {
+                const { latitude: lat, longitude: lon } = coords;
+                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+                const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+                const data = await res.json();
+                const addr = data.address || {};
+                // Build a short human-readable label: house+road or just town
+                const parts = [
+                    addr.house_number && addr.road ? `${addr.house_number} ${addr.road}` : addr.road,
+                    addr.city || addr.town || addr.village || addr.county,
+                    addr.state ? (STATE_ABBR[addr.state] || addr.state) : null,
+                ].filter(Boolean);
+                input.value = parts.join(', ');
+            } catch {
+                input.value = '';
+                alert('Could not look up your address. Please type it in manually.');
+            } finally {
+                input.placeholder = 'e.g. Hartford, CT';
+                btn.classList.remove('locating');
+                btn.disabled = false;
+            }
+        },
+        (err) => {
+            const msgs = {
+                1: 'Location access was denied. Please allow it in your browser settings.',
+                2: 'Your location could not be determined.',
+                3: 'Location request timed out.',
+            };
+            alert(msgs[err.code] || 'Could not get your location.');
+            input.placeholder = 'e.g. Hartford, CT';
+            btn.classList.remove('locating');
+            btn.disabled = false;
+        },
+        { timeout: 10000, maximumAge: 60000 }
+    );
+});
+
 // ── Stop fields ────────────────────────────────────────────────────────────
 let stopCount = 0;
 

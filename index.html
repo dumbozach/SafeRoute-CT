@@ -21,7 +21,12 @@
             <h2>Input Route</h2>
             <div class="field">
                 <label for="start-local">Starting Location</label>
-                <input type="text" id="start-local" placeholder="e.g. Hartford, CT">
+                <div class="input-with-btn">
+                    <input type="text" id="start-local" placeholder="e.g. Hartford, CT">
+                    <button type="button" id="btn-use-location" title="Use current location" aria-label="Use current location">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" stroke="none" fill="currentColor" opacity=".15"/></svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Dynamic stop fields are inserted here by JS -->
